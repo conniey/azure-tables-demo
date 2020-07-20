@@ -1,0 +1,13 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.conniey</groupId>
+  <artifactId>azure-tables-demo-parent</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <description>Azure Storage Tables demo (Parent)</description>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>azure-tables-demo</module>
+    <module>azure-tables-demo-legacy</module>
+  </modules>
+</project>
