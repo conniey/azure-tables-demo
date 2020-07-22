@@ -27,12 +27,6 @@ import java.util.Map;
 public class Program {
     private static final String TABLE_NAME = "MyTable";
     private static final String TABLES_CONNECTION_STRING_KEY = "AZURE_TABLES_CONNECTION_STRING";
-    private static final String TABLES_URL_KEY = "AZURE_TABLES_URL";
-
-    private static final String CLIENT_ID = System.getenv("AZURE_CLIENT_ID");
-    private static final String CLIENT_SECRET = System.getenv("AZURE_CLIENT_SECRET");
-    private static final String TENANT_ID = System.getenv("AZURE_TENANT_ID");
-    private static final String AUTHORITY = "https://login.microsoftonline.com/" + TENANT_ID;
     private static final String KEY_VAULT_URL = System.getenv("AZURE_KEY_VAULT_URL");
 
     /**
