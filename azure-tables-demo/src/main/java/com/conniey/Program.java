@@ -2,19 +2,15 @@
 // Licensed under the MIT License.
 package com.conniey;
 
-import com.azure.data.tables.AzureTable;
 import com.azure.data.tables.TableClient;
-import com.azure.data.tables.TableClientBuilder;
 import com.azure.data.tables.TableEntity;
 import com.azure.data.tables.TableServiceClient;
 import com.azure.data.tables.TableServiceClientBuilder;
 import com.azure.identity.DefaultAzureCredential;
 import com.azure.identity.DefaultAzureCredentialBuilder;
-import com.azure.security.keyvault.secrets.SecretAsyncClient;
 import com.azure.security.keyvault.secrets.SecretClient;
 import com.azure.security.keyvault.secrets.SecretClientBuilder;
 import com.azure.security.keyvault.secrets.models.KeyVaultSecret;
-import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.HashMap;
