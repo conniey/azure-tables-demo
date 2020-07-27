@@ -14,23 +14,18 @@ import com.microsoft.azure.keyvault.KeyVaultClient;
 import com.microsoft.azure.keyvault.authentication.AuthenticationResult;
 import com.microsoft.azure.keyvault.authentication.KeyVaultCredentials;
 import com.microsoft.azure.keyvault.models.SecretBundle;
-import com.microsoft.azure.storage.CloudStorageAccount;
 import com.microsoft.azure.storage.StorageCredentials;
 import com.microsoft.azure.storage.StorageCredentialsSharedAccessSignature;
 import com.microsoft.azure.storage.StorageException;
 import com.microsoft.azure.storage.table.CloudTable;
 import com.microsoft.azure.storage.table.CloudTableClient;
-import com.microsoft.azure.storage.table.EntityProperty;
-import com.microsoft.azure.storage.table.TableBatchOperation;
 import com.microsoft.azure.storage.table.TableOperation;
 import com.microsoft.azure.storage.table.TableResult;
 import com.microsoft.azure.storage.table.TableServiceEntity;
 
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.InvalidKeyException;
 import java.util.Collections;
 import java.util.Scanner;
 import java.util.Set;
@@ -108,7 +103,10 @@ public class Program {
             throw new RuntimeException("Unable to create entity.", e);
         }
 
-        System.out.println("Status: " + result.getHttpStatusCode());
+        final TableServiceEntity createdEntity = result.getResultAsType();
+        System.out.printf("Added table entity. Partition key: %s, row key: %s, ETag: %s.%n",
+            createdEntity.getPartitionKey(), createdEntity.getRowKey(), createdEntity.getEtag());
+
         System.out.println("Finished.");
     }
 
