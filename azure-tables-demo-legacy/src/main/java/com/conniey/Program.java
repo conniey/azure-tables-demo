@@ -20,6 +20,8 @@ import com.microsoft.azure.storage.StorageCredentialsSharedAccessSignature;
 import com.microsoft.azure.storage.StorageException;
 import com.microsoft.azure.storage.table.CloudTable;
 import com.microsoft.azure.storage.table.CloudTableClient;
+import com.microsoft.azure.storage.table.EntityProperty;
+import com.microsoft.azure.storage.table.TableBatchOperation;
 import com.microsoft.azure.storage.table.TableOperation;
 import com.microsoft.azure.storage.table.TableResult;
 import com.microsoft.azure.storage.table.TableServiceEntity;
@@ -30,6 +32,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.InvalidKeyException;
 import java.util.Collections;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -44,7 +47,7 @@ import java.util.concurrent.ExecutionException;
  * </ul>
  */
 public class Program {
-    private static final String TABLE_NAME = "MyTable";
+    private static final Scanner SCANNER = new Scanner(System.in);
 
     // Names of keys in Key Vault to fetch secrets from.
     private static final String KEY_VAULT_URL = "https://connieykv.vault.azure.net/";
@@ -61,34 +64,38 @@ public class Program {
      *
      * @param args Unused arguments to the program.
      */
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         final ITokenCacheAccessAspect tokenCache = new TokenCacheAspect("token.json");
 
         final KeyVaultClient keyVaultClient = createKeyVaultClient(CLIENT_ID, CLIENT_SECRET, AUTHORITY, tokenCache);
-        System.out.println("Fetching connection string and tables url from Key Vault.");
-        final SecretBundle tablesSasToken = keyVaultClient.getSecret(KEY_VAULT_URL, TABLES_SAS_TOKEN_KEY);
+        System.out.println("Fetching sas token and tables url from Key Vault.");
+        final SecretBundle sasToken = keyVaultClient.getSecret(KEY_VAULT_URL, TABLES_SAS_TOKEN_KEY);
         final SecretBundle tablesUrl = keyVaultClient.getSecret(KEY_VAULT_URL, TABLES_URL_KEY);
+        final StorageCredentials storageCredentials = new StorageCredentialsSharedAccessSignature(sasToken.value());
 
-        final StorageCredentials storageCredentials = new StorageCredentialsSharedAccessSignature(tablesSasToken.value());
-
-        System.out.println("Creating tables client for: " + tablesUrl.value());
+        System.out.println("Creating client for: " + tablesUrl.value());
         final CloudTableClient tableClient = new CloudTableClient(URI.create(tablesUrl.value()),
             storageCredentials);
 
+        final String tableName = getUserInput("Enter name of table");
         final CloudTable cloudTable;
         try {
-            cloudTable = tableClient.getTableReference(TABLE_NAME);
+            cloudTable = tableClient.getTableReference(tableName);
         } catch (URISyntaxException | StorageException e) {
             throw new RuntimeException("Unable to get table reference.", e);
         }
 
+        System.out.printf("Creating table '%s'.%n", tableName);
         try {
             cloudTable.createIfNotExists();
         } catch (StorageException e) {
-            throw new RuntimeException("Unable to create table: " + TABLE_NAME, e);
+            throw new RuntimeException("Unable to create table: " + tableName, e);
         }
 
-        final TableServiceEntity entity = new TableServiceEntity("my-partition", "my-row");
+        final String partitionKey = getUserInput("Enter partition key");
+        final String rowKey = getUserInput("Enter row key");
+        final TableServiceEntity entity = new TableServiceEntity(partitionKey, rowKey);
+
         final TableOperation operation = TableOperation.insert(entity);
 
         System.out.printf("Adding table entity. Partition key: %s, row key: %s.%n",
@@ -164,5 +171,10 @@ public class Program {
         } catch (MalformedURLException e) {
             throw new RuntimeException("Malformed URL for silent parameters.", e);
         }
+    }
+
+    private static String getUserInput(String prompt) {
+        System.out.print(prompt + ": ");
+        return SCANNER.nextLine();
     }
 }
