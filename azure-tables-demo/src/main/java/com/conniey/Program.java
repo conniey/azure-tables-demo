@@ -3,9 +3,9 @@
 package com.conniey;
 
 import com.azure.data.tables.TableClient;
-import com.azure.data.tables.TableEntity;
 import com.azure.data.tables.TableServiceClient;
 import com.azure.data.tables.TableServiceClientBuilder;
+import com.azure.data.tables.models.Entity;
 import com.azure.identity.DefaultAzureCredential;
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.security.keyvault.secrets.SecretClient;
@@ -13,8 +13,7 @@ import com.azure.security.keyvault.secrets.SecretClientBuilder;
 import com.azure.security.keyvault.secrets.models.KeyVaultSecret;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Scanner;
 
 /**
  * Sample demonstrates how to:
@@ -25,9 +24,12 @@ import java.util.Map;
  * </ul>
  */
 public class Program {
-    private static final String TABLE_NAME = "MyTable";
-    private static final String TABLES_CONNECTION_STRING_KEY = "AZURE_TABLES_CONNECTION_STRING";
-    private static final String KEY_VAULT_URL = System.getenv("AZURE_KEY_VAULT_URL");
+    private static final Scanner SCANNER = new Scanner(System.in);
+
+    // Names of keys in Key Vault to fetch secrets from.
+    private static final String KEY_VAULT_URL = "https://connieykv.vault.azure.net/";
+    private static final String TABLES_SAS_TOKEN_KEY = "connieystorage-tablesdemo";
+    private static final String TABLES_URL_KEY = "tablesurl";
 
     /**
      * Main method to invoke this demo.
@@ -41,25 +43,35 @@ public class Program {
             .vaultUrl(KEY_VAULT_URL)
             .buildClient();
 
-        System.out.println("Fetching connection string from Key Vault.");
-        final KeyVaultSecret tablesConnectionString = secretClient.getSecret(TABLES_CONNECTION_STRING_KEY);
+        System.out.println("Fetching sas token and tables url from Key Vault.");
+        final KeyVaultSecret sasToken = secretClient.getSecret(TABLES_SAS_TOKEN_KEY);
+        final KeyVaultSecret tablesUrl = secretClient.getSecret(TABLES_URL_KEY);
 
         final TableServiceClient tableServiceClient = new TableServiceClientBuilder()
-            .connectionString(tablesConnectionString.getValue())
+            .endpoint(tablesUrl.getValue())
+            .sasToken(sasToken.getValue())
             .buildClient();
 
-        System.out.println("Creating tables client for: " + TABLE_NAME);
-        final TableClient tableClient = tableServiceClient.getTableClient(TABLE_NAME);
+        final String tableName = getUserInput("Enter name of table");
+        System.out.printf("Creating table '%s'.%n", tableName);
 
-        final Map<String, Object> entityProperties = new HashMap<>();
-        entityProperties.put("partitionKey", "my-partition");
-        entityProperties.put("rowKey", "my-row");
-        final TableEntity entity = tableClient.createEntity(entityProperties);
+        final TableClient tableClient = tableServiceClient.getTableClient(tableName);
+        tableClient.create();
 
-        System.out.printf("Added table entity. Partition key: %s, row key: %s.%n",
-            entity.getPartitionKey(), entity.getRowKey());
+        final String partitionKey = getUserInput("Enter partition key");
+        final String rowKey = getUserInput("Enter row key");
+        final Entity entity = new Entity(partitionKey, rowKey);
 
-        System.out.println("Finished. Press any char to exit.");
-        System.in.read();
+        final Entity createdEntity = tableClient.createEntity(entity);
+
+        System.out.printf("Added table entity. Partition key: %s, row key: %s, ETag: %s.%n",
+            createdEntity.getPartitionKey(), createdEntity.getRowKey(), createdEntity.getETag());
+
+        System.out.println("Finished.");
+    }
+
+    private static String getUserInput(String prompt) {
+        System.out.print(prompt + ": ");
+        return SCANNER.nextLine();
     }
 }
