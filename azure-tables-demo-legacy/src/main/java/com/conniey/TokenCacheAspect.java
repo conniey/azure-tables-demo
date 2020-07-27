@@ -31,7 +31,12 @@ public class TokenCacheAspect implements ITokenCacheAccessAspect {
 
     private static String readDataFromFile(String resource) {
         try {
-            URL path = TokenCacheAspect.class.getResource(resource);
+            final URL path = TokenCacheAspect.class.getClassLoader().getResource(resource);
+            if (path == null) {
+                System.out.println("Could not locate resource: " + resource);
+                return "";
+            }
+
             return new String(
                 Files.readAllBytes(
                     Paths.get(path.toURI())));

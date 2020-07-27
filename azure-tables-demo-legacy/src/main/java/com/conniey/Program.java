@@ -14,11 +14,12 @@ import com.microsoft.azure.keyvault.KeyVaultClient;
 import com.microsoft.azure.keyvault.authentication.AuthenticationResult;
 import com.microsoft.azure.keyvault.authentication.KeyVaultCredentials;
 import com.microsoft.azure.keyvault.models.SecretBundle;
+import com.microsoft.azure.storage.CloudStorageAccount;
 import com.microsoft.azure.storage.StorageCredentials;
+import com.microsoft.azure.storage.StorageCredentialsSharedAccessSignature;
 import com.microsoft.azure.storage.StorageException;
 import com.microsoft.azure.storage.table.CloudTable;
 import com.microsoft.azure.storage.table.CloudTableClient;
-import com.microsoft.azure.storage.table.TableEntity;
 import com.microsoft.azure.storage.table.TableOperation;
 import com.microsoft.azure.storage.table.TableResult;
 import com.microsoft.azure.storage.table.TableServiceEntity;
@@ -31,6 +32,7 @@ import java.security.InvalidKeyException;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -43,14 +45,16 @@ import java.util.concurrent.ExecutionException;
  */
 public class Program {
     private static final String TABLE_NAME = "MyTable";
-    private static final String TABLES_CONNECTION_STRING_KEY = "AZURE_TABLES_CONNECTION_STRING";
-    private static final String TABLES_URL_KEY = "AZURE_TABLES_URL";
+
+    // Names of keys in Key Vault to fetch secrets from.
+    private static final String KEY_VAULT_URL = "https://connieykv.vault.azure.net/";
+    private static final String TABLES_SAS_TOKEN_KEY = "connieystorage-tablesdemo";
+    private static final String TABLES_URL_KEY = "tablesurl";
 
     private static final String CLIENT_ID = System.getenv("AZURE_CLIENT_ID");
     private static final String CLIENT_SECRET = System.getenv("AZURE_CLIENT_SECRET");
     private static final String TENANT_ID = System.getenv("AZURE_TENANT_ID");
     private static final String AUTHORITY = "https://login.microsoftonline.com/" + TENANT_ID;
-    private static final String KEY_VAULT_URL = System.getenv("AZURE_KEY_VAULT_URL");
 
     /**
      * Main method to invoke this demo.
@@ -58,20 +62,14 @@ public class Program {
      * @param args Unused arguments to the program.
      */
     public static void main(String[] args) throws IOException {
-        final ITokenCacheAccessAspect tokenCache = new TokenCacheAspect("tokens.json");
+        final ITokenCacheAccessAspect tokenCache = new TokenCacheAspect("token.json");
 
         final KeyVaultClient keyVaultClient = createKeyVaultClient(CLIENT_ID, CLIENT_SECRET, AUTHORITY, tokenCache);
-
         System.out.println("Fetching connection string and tables url from Key Vault.");
-        final SecretBundle tablesConnectionString = keyVaultClient.getSecret(KEY_VAULT_URL, TABLES_CONNECTION_STRING_KEY);
+        final SecretBundle tablesSasToken = keyVaultClient.getSecret(KEY_VAULT_URL, TABLES_SAS_TOKEN_KEY);
         final SecretBundle tablesUrl = keyVaultClient.getSecret(KEY_VAULT_URL, TABLES_URL_KEY);
 
-        final StorageCredentials storageCredentials;
-        try {
-            storageCredentials = StorageCredentials.tryParseCredentials(tablesConnectionString.value());
-        } catch (InvalidKeyException | StorageException e) {
-            throw new RuntimeException("Unable to create credentials.", e);
-        }
+        final StorageCredentials storageCredentials = new StorageCredentialsSharedAccessSignature(tablesSasToken.value());
 
         System.out.println("Creating tables client for: " + tablesUrl.value());
         final CloudTableClient tableClient = new CloudTableClient(URI.create(tablesUrl.value()),
@@ -85,7 +83,7 @@ public class Program {
         }
 
         try {
-            cloudTable.create();
+            cloudTable.createIfNotExists();
         } catch (StorageException e) {
             throw new RuntimeException("Unable to create table: " + TABLE_NAME, e);
         }
@@ -104,8 +102,7 @@ public class Program {
         }
 
         System.out.println("Status: " + result.getHttpStatusCode());
-        System.out.println("Finished. Press any char to exit.");
-        System.in.read();
+        System.out.println("Finished.");
     }
 
     private static KeyVaultClient createKeyVaultClient(String clientId, String clientSecret, String authority,
@@ -150,7 +147,13 @@ public class Program {
                     if (error == null) {
                         return CompletableFuture.completedFuture(result);
                     }
-                    if (!(error instanceof MsalException)) {
+                    if (!(error instanceof MsalException) && !(error instanceof CompletionException)) {
+                        return CompletableFuture.<IAuthenticationResult>failedFuture(error);
+                    }
+
+                    // Occurs when a .get() is made on an asynchronous operation, it's possible that the inner
+                    // exception is the MsalException.
+                    if (error.getCause() != null && !(error.getCause() instanceof MsalException)) {
                         return CompletableFuture.<IAuthenticationResult>failedFuture(error);
                     }
 
